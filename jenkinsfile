@@ -1,0 +1,40 @@
+pipeline{
+    tools{
+        maven 'pk'
+    }
+    agent any
+    stages{
+        stage('git checkout'){
+            steps{
+               git 'https://github.com/krishnapuppala97/spring-boot-mongo-docker.git' 
+            }
+        }
+        stage('install npm'){
+            steps{
+                sh " mvn clean install "
+            }
+        }
+        stage('build docker image'){
+            steps{
+                sh "docker build -t krishnapuppala97/spring_boot:$BUILD_NUMBER . "
+            }
+        }
+        stage('push the image in the docker hub'){
+            steps{
+            withCredentials([string(credentialsId: 'docker_hub_password', variable: 'docker_hub_password')]) {
+    sh " docker login -u krishnapuppala97 -p $docker_hub_password"
+    sh " docker push krishnapuppala97/spring_boot:$BUILD_NUMBER "
+}
+            }
+        }
+        stage('deploy'){
+            steps{
+                sshagent(['ssh_agent_key']) {
+				sh "ssh -o StrictHostKeyChecking=no ec2-user@172.31.82.206 rm -rf spring-boot-mongo-docker || ture "
+                    sh "ssh -o StrictHostKeyChecking=no ec2-user@172.31.82.206 git clone https://github.com/krishnapuppala97/spring-boot-mongo-docker.git "
+    sh 'ssh -o StrictHostKeyChecking=no ec2-user@172.31.82.206 docker-compose -f /home/ec2-user/spring-boot-mongo-docker/docker-compose1.yml -f /home/ec2-user/spring-boot-mongo-docker/docker-compose-qa.yml up -d   '
+}
+            }
+        }
+    }
+}
